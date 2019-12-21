@@ -1,47 +1,121 @@
-version: '2.0'
-
+version: "2"
 services:
- wordpress_vas_cz:
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    container_name: proxy
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - /etc/nginx/vhost.d
+      - /home/coil/certs:/etc/nginx/certs:ro
+      - /usr/share/nginx/html
+    restart: always 
+    networks:
+      - proxy_net
+    labels:
+      - com.github.jrcs.letsencrypt_nginx_proxy_companion.nginx_proxy
+#-----------------------------------------------------   
+  letsencrypt:
+    image: jrcs/letsencrypt-nginx-proxy-companion
+    container_name: encrypt
+    depends_on:
+      - nginx-proxy
+    volumes:
+      - /home/coil/certs:/etc/nginx/certs:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    volumes_from:
+      - nginx-proxy
+    restart: always 
+    networks:
+      - proxy_net
+#-----------------------------------------------------   
+  certs:
+    image: tutum/apache-php
+    container_name: certs
+    environment:
+      - VIRTUAL_HOST=tcoil.info,www.tcoil.info,vasulka.cz,www.vasulka.cz
+      - LETSENCRYPT_HOST=tcoil.info,www.tcoil.info,vasulka.cz,www.vasulka.cz
+      - LETSENCRYPT_EMAIL=michal.vasulka@gmail.com
+    restart: always 
+    networks:
+      - cert_net
+#-----------------------------------------------------      
+  wordpress_vas_cz:
     image: wordpress
+    container_name: wordpress_vas_cz
     links:
      - mariadb_vas_cz:mysql
     environment:
      - WORDPRESS_DB_PASSWORD=password
+     - VIRTUAL_HOST=vasulka.cz,www.vasulka.cz
     ports:
-     - "8083:80"
+     - "3001:80"
+    depends_on:
+     - nginx-proxy
+     - letsencrypt    
+     - mariadb_vas_cz
     volumes:
      - ./code_vas_cz:/code
      - ./html_vas_cz:/var/www/html
-# sonm_cloud is now tcoil_info website
- wordpress_sonm_cloud:
-    image: wordpress
-    links:
-     - mariadb_sonm_cloud:mysql
-    environment:
-     - WORDPRESS_DB_PASSWORD=password
-    ports:
-     - "8087:80"
-    volumes:
-     - ./code_sonm_cloud:/code
-     - ./html_sonm_cloud:/var/www/html
+    restart: always
+    networks:
+      - proxy_net
 
-
-
- mariadb_vas_cz:
+  mariadb_vas_cz:
     image: mariadb
     environment:
      - MYSQL_ROOT_PASSWORD=password
      - MYSQL_DATABASE_4=wordpress_vas_cz
-    ports:
-     - "3310:3306"
+    depends_on:
+     - nginx-proxy
+     - letsencrypt           
     volumes:
      - ./database_vas_cz:/var/lib/mysql
- mariadb_sonm_cloud:
+    restart: always
+    networks:
+      - proxy_net  
+#-----------------------------------------------------  
+#-----------------------------------------------------  
+  # sonm_cloud is now tcoil_info website
+  wordpress_sonm_cloud:
+    image: wordpress
+    container_name: wordpress_sonm_cloud
+    links:
+     - mariadb_sonm_cloud:mysql
+    environment:
+     - WORDPRESS_DB_PASSWORD=password
+     - VIRTUAL_HOST=tcoil.info,www.tcoil.info
+    ports:
+     - "3000:80"
+    depends_on:
+      - nginx-proxy
+      - letsencrypt    
+      - mariadb_sonm_cloud  
+    volumes:
+     - ./code_sonm_cloud:/code
+     - ./html_sonm_cloud:/var/www/html
+    restart: always
+    networks:
+      - proxy_net     
+     
+  mariadb_sonm_cloud:
     image: mariadb
     environment:
      - MYSQL_ROOT_PASSWORD=password
      - MYSQL_DATABASE_8=wordpress_sonm_cloud
-    ports:
-     - "3314:3306"
+    depends_on:
+     - nginx-proxy
+     - letsencrypt         
     volumes:
      - ./database_sonm_cloud:/var/lib/mysql
+    restart: always
+    networks:
+      - proxy_net  
+#----------------------------------------------------- 
+networks:
+  cert_net:
+    driver: bridge
+  proxy_net:
+    driver: bridge
