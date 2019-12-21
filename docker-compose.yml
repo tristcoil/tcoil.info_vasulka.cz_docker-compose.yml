@@ -1,0 +1,47 @@
+version: '2.0'
+
+services:
+ wordpress_vas_cz:
+    image: wordpress
+    links:
+     - mariadb_vas_cz:mysql
+    environment:
+     - WORDPRESS_DB_PASSWORD=password
+    ports:
+     - "8083:80"
+    volumes:
+     - ./code_vas_cz:/code
+     - ./html_vas_cz:/var/www/html
+# sonm_cloud is now tcoil_info website
+ wordpress_sonm_cloud:
+    image: wordpress
+    links:
+     - mariadb_sonm_cloud:mysql
+    environment:
+     - WORDPRESS_DB_PASSWORD=password
+    ports:
+     - "8087:80"
+    volumes:
+     - ./code_sonm_cloud:/code
+     - ./html_sonm_cloud:/var/www/html
+
+
+
+ mariadb_vas_cz:
+    image: mariadb
+    environment:
+     - MYSQL_ROOT_PASSWORD=password
+     - MYSQL_DATABASE_4=wordpress_vas_cz
+    ports:
+     - "3310:3306"
+    volumes:
+     - ./database_vas_cz:/var/lib/mysql
+ mariadb_sonm_cloud:
+    image: mariadb
+    environment:
+     - MYSQL_ROOT_PASSWORD=password
+     - MYSQL_DATABASE_8=wordpress_sonm_cloud
+    ports:
+     - "3314:3306"
+    volumes:
+     - ./database_sonm_cloud:/var/lib/mysql
